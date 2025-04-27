@@ -26,7 +26,7 @@ public class Main {
                     + "&start_date=1941-01-01"
                     + "&end_date=2024-12-31"
                     + "&daily=weather_code,temperature_2m_mean,temperature_2m_max,temperature_2m_min,"
-                    + "apparent_temperature_mean,rain_sum,snowfall_sum,relative_humidity_2m_mean,wind_speed_10m_max,wind_direction_10m_dominant,visibility_mean"
+                    + "apparent_temperature_mean,rain_sum,snowfall_sum,relative_humidity_2m_mean,wind_speed_10m_max,wind_direction_10m_dominant,cloud_cover_mean"
                     + "&timezone=auto"
                     + "&utm_source=chatgpt.com";
 
@@ -34,8 +34,8 @@ public class Main {
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
             connection.setRequestMethod("GET");
-            connection.setConnectTimeout(10000); // 10 seconds
-            connection.setReadTimeout(10000);
+            connection.setConnectTimeout(15000); // 10 seconds
+            connection.setReadTimeout(25000);
 
             int status = connection.getResponseCode();
             BufferedReader reader;
@@ -56,11 +56,14 @@ public class Main {
             System.out.println("Response Code: " + status);
 
             if (status == 429) {
-                throw new IOException("Hourly API request limit exceeded");
+                System.out.println(response);
+                throw new IOException("API request limit exceeded");
+
 
             } else {
                 FileWriter fw = new FileWriter("out/response.json");
                 fw.write(response.toString());
+                fw.flush();
                 fw.close();
             }
 
@@ -70,7 +73,7 @@ public class Main {
         }
     }
 
-    private static void loadJSON(File file) throws FileNotFoundException {
+    private static void loadJSON(File file) throws IOException {
         StringBuilder json = new StringBuilder();
         Scanner sc = new Scanner(file);
         while (sc.hasNext()) {
@@ -92,7 +95,7 @@ public class Main {
         JSONArray vlhkosti = daily.getJSONArray("relative_humidity_2m_mean");
         JSONArray rychlostiVetru = daily.getJSONArray("wind_speed_10m_max");
         JSONArray smeryVetru = daily.getJSONArray("wind_direction_10m_dominant");
-        JSONArray viditelnosti = daily.getJSONArray("visibility_mean");
+        JSONArray oblacnosti = daily.getJSONArray("cloud_cover_mean");
 
         List<Object> weatherCodes = daily.getJSONArray("weather_code").toList();
 
@@ -112,8 +115,11 @@ public class Main {
         List<Double> teploty = new ArrayList<>();
         List<Double> srazkyList = new ArrayList<>();
         List<Double> vlhkostList = new ArrayList<>();
-        List<Double> snehu = new ArrayList<>();
+        List<Double> srazkySnehuList = new ArrayList<>();
 
+        FileWriter csvWriter = new FileWriter("out/weather_data.csv");
+        //write header row
+        csvWriter.append("Date,Weather Description,Mean Temp (°C),Max Temp (°C),Min Temp (°C),Apparent Temp (°C),Rain (mm),Snowfall (cm),Humidity (%),Wind Speed Max (km/h),Wind Direction (sever; jih; zapad; vychod),Oblacnost, extremni pocasi(tropy(t>30°C); mrazy(t<0°C); normalni)\n");
 
 
         for (int i = 0; i < dny.toList().size(); i++) {
@@ -135,13 +141,17 @@ public class Main {
             double vlhkost = vlhkosti.getDouble(i);
             double smerVetru = smeryVetru.getDouble(i);
             double rychlostVetru = rychlostiVetru.getDouble(i);
-            double viditelnost = viditelnosti.getDouble(i);
+            double cloudCover = oblacnosti.getDouble(i);
 
-            double snezilo = snezeni.getDouble(i) ;
+            double srazkySnehu = snezeni.getDouble(i) ;
 
             //kvantitatuvni znaky
             double teplotniRozdil = maxTeplota - teplota;
             teplotniRozdily.add(teplotniRozdil);
+            teploty.add(teplota);
+            srazkyList.add(srazkek);
+            vlhkostList.add(vlhkost);
+            srazkySnehuList.add(srazkySnehu);
 
 
             //kvalitativni znaky
@@ -155,6 +165,7 @@ public class Main {
             jihCount = svetStranaVetru.equals("Jih") ? jihCount + 1 : jihCount;
             vychodCount = svetStranaVetru.equals("Vychod") ? vychodCount + 1 : vychodCount;
             zapadCount = svetStranaVetru.equals("Zapad") ? zapadCount + 1 : zapadCount;
+
             //Extremni vykyvy(tropicky/mrazivy den)
             boolean tropy = maxTeplota >= 30.0;
             boolean mrazy = minTeplota <= 0;
@@ -162,11 +173,12 @@ public class Main {
             extremniPocasi = !tropy && !mrazy ? "normalni" : extremniPocasi;
             tropyCount = extremniPocasi.equals("tropy") ? tropyCount + 1 : tropyCount;
             mrazyCount = extremniPocasi.equals("mrazy") ? mrazyCount + 1 : mrazyCount;
-            //Viditelnost
-            String viditelnostUroven = viditelnost >= 10 ? "Velmi Dobrá" : "Dobrá";
-            viditelnostUroven = viditelnost <= 5 ? "Přijatelná" : viditelnostUroven;
-            viditelnostUroven = viditelnost <= 2 ? "Špatná" : viditelnostUroven;
-            viditelnostUroven = viditelnost <= 1 ? "Velmi Špatná" : viditelnostUroven;
+
+            String oblačnostStupnice = cloudCover <= 10 ? "Jasno" : "Skoro jasno";
+            oblačnostStupnice = cloudCover > 25 ? "Polojasno" : oblačnostStupnice;
+            oblačnostStupnice = cloudCover > 50 ? "Oblačno" : oblačnostStupnice;
+            oblačnostStupnice = cloudCover > 75 ? "Skoro zataženo" : oblačnostStupnice;
+            oblačnostStupnice = cloudCover > 90 ? "Zataženo" : oblačnostStupnice;
             //Vetrnost
             String vetrnostStupnice = rychlostVetru <= 1 ? "Bezvětří" : "Vánek";
             vetrnostStupnice = rychlostVetru >= 6 ? "Slabý vánek" : vetrnostStupnice;
@@ -181,8 +193,25 @@ public class Main {
             vetrnostStupnice = rychlostVetru >= 103 ? "Silná vichřice" : vetrnostStupnice;
             vetrnostStupnice = rychlostVetru >= 118 ? "Orkán" : vetrnostStupnice;
 
+            csvWriter.append(dny.getString(i)).append(",")//datum
+                    .append(popisy.get(i)).append(",")//popis pocasi
+                    .append(denniTeploty.get(i).toString()).append(",")//medianova teplota za den
+                    .append(maxTeploty.get(i).toString()).append(",")//nejvyssi teplota za den
+                    .append(minTeploty.get(i).toString()).append(",")//nejmensi teplota za den
+                    .append(pocitoveTeploty.get(i).toString()).append(",")//medianova pocitova teplota za den
+                    .append(srazky.get(i).toString()).append(",")//pocet srazek (mm) za den
+                    .append(snezeni.get(i).toString()).append(",")//kolik snehu nasnezilo (cm) za den
+                    .append(vlhkosti.get(i).toString()).append(",")//vlhkost za den
+                    .append(vetrnostStupnice).append(",")//jak moc foukal vitr
+                    .append(svetStranaVetru).append(",")//jakym smerem foukal vitr
+                    .append(oblačnostStupnice).append(",")//jaka je uroven uvIndex
+                    .append(extremniPocasi)//extremni pocasi(tropy, mrazy)
+                    .append("\n");
 
         }
+        csvWriter.flush();
+        csvWriter.close();
+        System.out.println("CSV file generated: out/weather_data.csv");
         System.out.println(tropyCount + " Tropických dnů a " + mrazyCount + " Mrazivých dnů");
         System.out.println(zaokrouhli((tropyCount / (double) dny.toList().size()) * 100, 2) + "% všech dní je tropických(t>30°C); " + zaokrouhli((mrazyCount / (double) dny.toList().size()) * 100, 2) + "% všech dní je mrazivých(t<0°C);");
         Collections.sort(teplotniRozdily);
@@ -208,18 +237,20 @@ public class Main {
 
     private static void startup() {
         System.out.println("\n" +
-                " __      __               __  .__                ___________     __         .__                    ____     ____ \n" +
-                "/  \\    /  \\ ____ _____ _/  |_|  |__   __________\\_   _____/____/  |_  ____ |  |__   ___________  /_   |   /_   |\n" +
-                "\\   \\/\\/   // __ \\\\__  \\\\   __\\  |  \\_/ __ \\_  __ \\    __)/ __ \\   __\\/ ___\\|  |  \\_/ __ \\_  __ \\  |   |    |   |\n" +
-                " \\        /\\  ___/ / __ \\|  | |   Y  \\  ___/|  | \\/     \\\\  ___/|  | \\  \\___|   Y  \\  ___/|  | \\/  |   |    |   |\n" +
-                "  \\__/\\  /  \\___  >____  /__| |___|  /\\___  >__|  \\___  / \\___  >__|  \\___  >___|  /\\___  >__|     |___| /\\ |___|\n" +
-                "       \\/       \\/     \\/          \\/     \\/          \\/      \\/          \\/     \\/     \\/               \\/      \n");
+                " __      __               __  .__                ___________     __         .__                    ____     ________  \n" +
+                "/  \\    /  \\ ____ _____ _/  |_|  |__   __________\\_   _____/____/  |_  ____ |  |__   ___________  /_   |    \\_____  \\ \n" +
+                "\\   \\/\\/   // __ \\\\__  \\\\   __\\  |  \\_/ __ \\_  __ \\    __)/ __ \\   __\\/ ___\\|  |  \\_/ __ \\_  __ \\  |   |     /  ____/ \n" +
+                " \\        /\\  ___/ / __ \\|  | |   Y  \\  ___/|  | \\/     \\\\  ___/|  | \\  \\___|   Y  \\  ___/|  | \\/  |   |    /       \\ \n" +
+                "  \\__/\\  /  \\___  >____  /__| |___|  /\\___  >__|  \\___  / \\___  >__|  \\___  >___|  /\\___  >__|     |___| /\\ \\_______ \\\n" +
+                "       \\/       \\/     \\/          \\/     \\/          \\/      \\/          \\/     \\/     \\/               \\/         \\/\n");
         System.out.println("by Fejdam | https://github.com/FiDaLip/WeatherFetcher#");
 
-        loadData();
+//        loadData();
         try {
             loadJSON(new File("out/response.json"));
         } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
