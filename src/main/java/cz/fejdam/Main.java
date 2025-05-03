@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.time.LocalDate;
 import java.util.*;
 
 public class Main {
@@ -21,8 +22,8 @@ public class Main {
     private static void loadData() {
         try {
             String urlString = "https://archive-api.open-meteo.com/v1/archive"
-                    + "?latitude=50.0096"
-                    + "&longitude=14.462"
+                    + "?latitude=50.086742"
+                    + "&longitude=14.417145"
                     + "&start_date=1941-01-01"
                     + "&end_date=2024-12-31"
                     + "&daily=weather_code,temperature_2m_mean,temperature_2m_max,temperature_2m_min,"
@@ -143,7 +144,7 @@ public class Main {
             double rychlostVetru = rychlostiVetru.getDouble(i);
             double cloudCover = oblacnosti.getDouble(i);
 
-            double srazkySnehu = snezeni.getDouble(i) ;
+            double srazkySnehu = snezeni.getDouble(i);
 
             //kvantitatuvni znaky
             double teplotniRozdil = maxTeplota - teplota;
@@ -209,6 +210,7 @@ public class Main {
                     .append("\n");
 
         }
+        getYearlyData(daily);
         csvWriter.flush();
         csvWriter.close();
         System.out.println("CSV file generated: out/weather_data.csv");
@@ -229,6 +231,115 @@ public class Main {
 
 
     }
+
+    private static void getYearlyData(JSONObject daily) throws IOException {
+        JSONArray dny = daily.getJSONArray("time");
+
+        // Počet let (včetně posledního roku)
+        int pocetRoku = Integer.parseInt(dny.getString(dny.length() - 1).split("-")[0]) - Integer.parseInt(dny.getString(0).split("-")[0]) + 1;
+
+        JSONArray denniTeploty = daily.getJSONArray("temperature_2m_mean");
+        JSONArray maxTeploty = daily.getJSONArray("temperature_2m_max");
+        JSONArray minTeploty = daily.getJSONArray("temperature_2m_min");
+        JSONArray snowfalls = daily.getJSONArray("snowfall_sum");
+        JSONArray rains = daily.getJSONArray("rain_sum");
+
+        FileWriter csvWriter = new FileWriter("out/weather_data_yearly.csv");
+        // write header row
+        csvWriter.append("Year,Winter Avg Temp (°C),Winter Maximum Temp (°C),Winter Minimum Temp (°C),Spring Avg Temp (°C),Spring Maximum Temp (°C),Spring Minimum Temp (°C),Summer Avg Temp (°C),Summer Maximum Temp (°C),Summer Minimum Temp (°C),Autumn Avg Temp (°C),Autumn Maximum Temp (°C),Autumn Minimum Temp (°C),Rain (mm),Snowfall (cm)\n");
+
+        // Zpracování dat pro každý rok
+        for (int i = 0; i < pocetRoku; i++) {
+            double snowfall = 0;
+            double rain = 0;
+
+            double zimaAvgTeplotas = 0;
+            double zimaMaxTeplota = Double.MIN_VALUE;
+            double zimaMinTeplota = Double.MAX_VALUE;
+
+            double jaroAvgTeplotas = 0;
+            double jaroMaxTeplota = Double.MIN_VALUE;
+            double jaroMinTeplota = Double.MAX_VALUE;
+
+            double letoAvgTeplotas = 0;
+            double letoMaxTeplota = Double.MIN_VALUE;
+            double letoMinTeplota = Double.MAX_VALUE;
+
+            double podzimAvgTeplotas = 0;
+            double podzimMaxTeplota = Double.MIN_VALUE;
+            double podzimMinTeplota = Double.MAX_VALUE;
+
+            int daysInWinter = 0, daysInSpring = 0, daysInSummer = 0, daysInAutumn = 0;
+
+            // Zpracování dní pro daný rok
+            for (int days = 0; days < dny.length(); days++) {
+                String[] parts = dny.getString(days).split("-");
+                int yearIndex = Integer.parseInt(parts[0]);
+                int month = Integer.parseInt(parts[1]);
+
+                int seasonYear = (month == 12) ? yearIndex + 1 : yearIndex;
+                if (seasonYear != i + Integer.parseInt(dny.getString(0).split("-")[0])) continue; // Ověření, že jde o správný rok
+
+                double avg = denniTeploty.getBigDecimal(days).doubleValue();
+                double max = maxTeploty.getBigDecimal(days).doubleValue();
+                double min = minTeploty.getBigDecimal(days).doubleValue();
+
+                if (month >= 6 && month <= 8) { // léto
+                    letoAvgTeplotas += avg;
+                    letoMaxTeplota = Math.max(letoMaxTeplota, max);
+                    letoMinTeplota = Math.min(letoMinTeplota, min);
+                    daysInSummer++;
+                } else if (month >= 9 && month <= 11) { // podzim
+                    podzimAvgTeplotas += avg;
+                    podzimMaxTeplota = Math.max(podzimMaxTeplota, max);
+                    podzimMinTeplota = Math.min(podzimMinTeplota, min);
+                    daysInAutumn++;
+                } else if (month == 12 || month <= 2) { // zima
+                    zimaAvgTeplotas += avg;
+                    zimaMaxTeplota = Math.max(zimaMaxTeplota, max);
+                    zimaMinTeplota = Math.min(zimaMinTeplota, min);
+                    daysInWinter++;
+                } else { // jaro
+                    jaroAvgTeplotas += avg;
+                    jaroMaxTeplota = Math.max(jaroMaxTeplota, max);
+                    jaroMinTeplota = Math.min(jaroMinTeplota, min);
+                    daysInSpring++;
+                }
+
+                snowfall += snowfalls.getDouble(days);
+                rain += rains.getDouble(days);
+            }
+
+            // Výpočet průměrné teploty na základě skutečného počtu dní
+            csvWriter.append(String.valueOf(i + Integer.parseInt(dny.getString(0).split("-")[0]))).append(",")
+                    .append(String.valueOf(zaokrouhli(zimaAvgTeplotas / daysInWinter, 2))).append(",")
+                    .append(String.valueOf(zaokrouhli(zimaMaxTeplota, 2))).append(",")
+                    .append(String.valueOf(zaokrouhli(zimaMinTeplota, 2))).append(",")
+                    .append(String.valueOf(zaokrouhli(jaroAvgTeplotas / daysInSpring, 2))).append(",")
+                    .append(String.valueOf(zaokrouhli(jaroMaxTeplota, 2))).append(",")
+                    .append(String.valueOf(zaokrouhli(jaroMinTeplota, 2))).append(",")
+                    .append(String.valueOf(zaokrouhli(letoAvgTeplotas / daysInSummer, 2))).append(",")
+                    .append(String.valueOf(zaokrouhli(letoMaxTeplota, 2))).append(",")
+                    .append(String.valueOf(zaokrouhli(letoMinTeplota, 2))).append(",")
+                    .append(String.valueOf(zaokrouhli(podzimAvgTeplotas / daysInAutumn, 2))).append(",")
+                    .append(String.valueOf(zaokrouhli(podzimMaxTeplota, 2))).append(",")
+                    .append(String.valueOf(zaokrouhli(podzimMinTeplota, 2))).append(",")
+                    .append(String.valueOf(zaokrouhli(rain, 2))).append(",")
+                    .append(String.valueOf(zaokrouhli(snowfall, 2))).append("\n");
+
+            System.out.println(i + Integer.parseInt(dny.getString(0).split("-")[0]) + " Zima; Průměrná teplota: " + zaokrouhli(zimaAvgTeplotas / daysInWinter, 2));
+            System.out.println(i + Integer.parseInt(dny.getString(0).split("-")[0]) + " Jaro; Průměrná teplota: " + zaokrouhli(jaroAvgTeplotas / daysInSpring, 2));
+            System.out.println(i + Integer.parseInt(dny.getString(0).split("-")[0]) + " Leto; Průměrná teplota: " + zaokrouhli(letoAvgTeplotas / daysInSummer, 2));
+            System.out.println(i + Integer.parseInt(dny.getString(0).split("-")[0]) + " Podzim; Průměrná teplota: " + zaokrouhli(podzimAvgTeplotas / daysInAutumn, 2));
+            System.out.println(i + Integer.parseInt(dny.getString(0).split("-")[0]) + " Rainfall: " + rain + "; Snowfall: " + snowfall);
+            System.out.println("-------------------------------------------------------------------------------------------------");
+        }
+
+        csvWriter.flush();
+        csvWriter.close();
+        System.out.println("CSV file generated: out/weather_data_yearly.csv");
+    }
+
 
     private static double zaokrouhli(double cislo, int mist) {
         BigDecimal bigDecimal = new BigDecimal(cislo);
