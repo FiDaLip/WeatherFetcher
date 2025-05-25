@@ -6,8 +6,11 @@ import org.json.JSONObject;
 import java.io.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -26,52 +29,42 @@ public class Main {
                     + "&start_date=1940-01-02"
                     + "&end_date=2024-12-31"
                     + "&daily=weather_code,temperature_2m_mean,temperature_2m_max,temperature_2m_min,"
-                    + "apparent_temperature_mean,rain_sum,snowfall_sum,relative_humidity_2m_mean,wind_speed_10m_max,wind_direction_10m_dominant,cloud_cover_mean"
+                    + "apparent_temperature_mean,rain_sum,snowfall_sum,relative_humidity_2m_mean,"
+                    + "wind_speed_10m_max,wind_direction_10m_dominant,cloud_cover_mean"
                     + "&timezone=auto"
                     + "&utm_source=chatgpt.com";
 
-            URL url = new URL(urlString);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(15))
+                    .build();
 
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(15000); // 10 seconds
-            connection.setReadTimeout(25000);
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(urlString))
+                    .timeout(Duration.ofSeconds(25))
+                    .GET()
+                    .build();
 
-            int status = connection.getResponseCode();
-            BufferedReader reader;
-            if (status >= 200 && status < 300) {
-                reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-            } else {
-                reader = new BufferedReader(new InputStreamReader(connection.getErrorStream()));
-            }
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            int status = response.statusCode();
+            String body = response.body();
 
-            String line;
-            StringBuilder response = new StringBuilder();
-            while ((line = reader.readLine()) != null) {
-                response.append(line).append("\n");
-            }
-
-            reader.close();
-            connection.disconnect();
             System.out.println("Response Code: " + status);
 
             if (status == 429) {
-                System.out.println(response);
+                System.out.println(body);
                 throw new IOException("API request limit exceeded");
-
-
             } else {
                 FileWriter fw = new FileWriter("out/response.json");
-                fw.write(response.toString());
+                fw.write(body);
                 fw.flush();
                 fw.close();
             }
 
-
         } catch (Exception e) {
-            System.out.println(e.toString());
+            throw new RuntimeException(e);
         }
     }
+
 
     private static void loadJSON(File file) throws IOException {
         StringBuilder json = new StringBuilder();
@@ -145,7 +138,6 @@ public class Main {
             //kvantitatuvni znaky
             double teplotniRozdil = maxTeplota - teplota;
             teplotniRozdily.add(teplotniRozdil);
-
 
 
             //kvalitativni znaky
