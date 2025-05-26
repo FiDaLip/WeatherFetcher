@@ -143,9 +143,17 @@ public class Main {
             //kvalitativni znaky
 
             //smer vetru
-            String svetStranaVetru = smerVetru > 315 || smerVetru < 45 ? "Sever" : "Jih";
-            svetStranaVetru = smerVetru > 225 && smerVetru < 315 ? "Zapad" : svetStranaVetru;
-            svetStranaVetru = smerVetru < 135 && smerVetru > 45 ? "Vychod" : svetStranaVetru;
+            String svetStranaVetru;
+            if (smerVetru >= 45 && smerVetru < 135) {
+                svetStranaVetru = "Vychod";
+            } else if (smerVetru >= 135 && smerVetru < 225) {
+                svetStranaVetru = "Jih";
+            } else if (smerVetru >= 225 && smerVetru < 315) {
+                svetStranaVetru = "Zapad";
+            } else {
+                svetStranaVetru = "Sever";
+            }
+
 
             severCount = svetStranaVetru.equals("Sever") ? severCount + 1 : severCount;
             jihCount = svetStranaVetru.equals("Jih") ? jihCount + 1 : jihCount;
@@ -160,24 +168,49 @@ public class Main {
             tropyCount = extremniPocasi.equals("tropy") ? tropyCount + 1 : tropyCount;
             mrazyCount = extremniPocasi.equals("mrazy") ? mrazyCount + 1 : mrazyCount;
 
-            String oblacnostStupnice = cloudCover <= 10 ? "Jasno" : "Skoro jasno";
-            oblacnostStupnice = cloudCover > 25 ? "Polojasno" : oblacnostStupnice;
-            oblacnostStupnice = cloudCover > 50 ? "Oblačno" : oblacnostStupnice;
-            oblacnostStupnice = cloudCover > 75 ? "Skoro zataženo" : oblacnostStupnice;
-            oblacnostStupnice = cloudCover > 90 ? "Zataženo" : oblacnostStupnice;
+            String oblacnostStupnice;
+
+            if (cloudCover > 90) {
+                oblacnostStupnice = "Zataženo";
+            } else if (cloudCover > 75) {
+                oblacnostStupnice = "Skoro zataženo";
+            } else if (cloudCover > 50) {
+                oblacnostStupnice = "Oblačno";
+            } else if (cloudCover > 25) {
+                oblacnostStupnice = "Polojasno";
+            } else {
+                oblacnostStupnice = "Jasno";
+            }
             //Vetrnost
-            String vetrnostStupnice = rychlostVetru <= 1 ? "Bezvětří" : "Vánek";
-            vetrnostStupnice = rychlostVetru >= 6 ? "Slabý vánek" : vetrnostStupnice;
-            vetrnostStupnice = rychlostVetru >= 12 ? "Mírný vánek" : vetrnostStupnice;
-            vetrnostStupnice = rychlostVetru >= 20 ? "Mírný vítr" : vetrnostStupnice;
-            vetrnostStupnice = rychlostVetru >= 29 ? "Čerstvý vítr" : vetrnostStupnice;
-            vetrnostStupnice = rychlostVetru >= 39 ? "Silný vítr" : vetrnostStupnice;
-            vetrnostStupnice = rychlostVetru >= 50 ? "Velmi silný vítr" : vetrnostStupnice;
-            vetrnostStupnice = rychlostVetru >= 62 ? "Bouřlivý vítr" : vetrnostStupnice;
-            vetrnostStupnice = rychlostVetru >= 75 ? "Silná bouře" : vetrnostStupnice;
-            vetrnostStupnice = rychlostVetru >= 89 ? "Plná bouře" : vetrnostStupnice;
-            vetrnostStupnice = rychlostVetru >= 103 ? "Silná vichřice" : vetrnostStupnice;
-            vetrnostStupnice = rychlostVetru >= 118 ? "Orkán" : vetrnostStupnice;
+            String vetrnostStupnice;
+
+            if (rychlostVetru >= 118) {
+                vetrnostStupnice = "Orkán";
+            } else if (rychlostVetru >= 103) {
+                vetrnostStupnice = "Silná vichřice";
+            } else if (rychlostVetru >= 89) {
+                vetrnostStupnice = "Plná bouře";
+            } else if (rychlostVetru >= 75) {
+                vetrnostStupnice = "Silná bouře";
+            } else if (rychlostVetru >= 62) {
+                vetrnostStupnice = "Bouřlivý vítr";
+            } else if (rychlostVetru >= 50) {
+                vetrnostStupnice = "Velmi silný vítr";
+            } else if (rychlostVetru >= 39) {
+                vetrnostStupnice = "Silný vítr";
+            } else if (rychlostVetru >= 29) {
+                vetrnostStupnice = "Čerstvý vítr";
+            } else if (rychlostVetru >= 20) {
+                vetrnostStupnice = "Mírný vítr";
+            } else if (rychlostVetru >= 12) {
+                vetrnostStupnice = "Mírný vánek";
+            } else if (rychlostVetru >= 6) {
+                vetrnostStupnice = "Slabý vánek";
+            } else if (rychlostVetru > 1) {
+                vetrnostStupnice = "Vánek";
+            } else {
+                vetrnostStupnice = "Bezvětří";
+            }
 
             csvWriter.append(dny.getString(i)).append(",")//datum
                     .append(popisy.get(i)).append(",")//popis pocasi
@@ -203,10 +236,11 @@ public class Main {
         System.out.println(zaokrouhli((tropyCount / (double) dny.toList().size()) * 100) + "% všech dní je tropických(t>30°C); " + zaokrouhli((mrazyCount / (double) dny.toList().size()) * 100) + "% všech dní je mrazivých(t<0°C);");
         Collections.sort(teplotniRozdily);
         double medianTeplotniRozdil;
-        if (teplotniRozdily.size() % 2 == 1) {
-            medianTeplotniRozdil = (teplotniRozdily.get((teplotniRozdily.size() / 2) - 1) + teplotniRozdily.get((teplotniRozdily.size() / 2) + 1)) / 2;
+        if (teplotniRozdily.size() % 2 == 0) {
+            int mid = teplotniRozdily.size() / 2;
+            medianTeplotniRozdil = (teplotniRozdily.get(mid - 1) + teplotniRozdily.get(mid)) / 2;
         } else {
-            medianTeplotniRozdil = teplotniRozdily.get((teplotniRozdily.size() / 2));
+            medianTeplotniRozdil = teplotniRozdily.get(teplotniRozdily.size() / 2);
         }
         System.out.println(severCount + "x Severni vitr, " + jihCount + "x Jizni vitr, " + vychodCount + "x Vychodni vitr, " + zapadCount + "x Zapadni vitr");
         System.out.println(
@@ -232,7 +266,11 @@ public class Main {
 
         FileWriter csvWriter = new FileWriter("out/weather_data_yearly.csv");
         // write header row
-        csvWriter.append("Year,Winter Avg Temp (°C),Winter Maximum Temp (°C),Winter Minimum Temp (°C),Winter Average Cloud Cover(%),Spring Avg Temp (°C),Spring Maximum Temp (°C),Spring Minimum Temp (°C),Spring Average Cloud Cover(%),Summer Avg Temp (°C),Summer Maximum Temp (°C),Summer Minimum Temp (°C),Summer Average Cloud Cover(%),Autumn Avg Temp (°C),Autumn Maximum Temp (°C),Autumn Minimum Temp (°C),Autumn Average Cloud Cover(%),Rain (mm),Snowfall (cm), Cloud Cover Average(%)\n");
+        csvWriter.append("Year,Winter Avg Temp (°C),Winter Maximum Temp (°C),Winter Minimum Temp (°C),Winter Average Cloud Cover(%)," +
+                        "Spring Avg Temp (°C),Spring Maximum Temp (°C),Spring Minimum Temp (°C),Spring Average Cloud Cover(%)," +
+                        "Summer Avg Temp (°C),Summer Maximum Temp (°C),Summer Minimum Temp (°C),Summer Average Cloud Cover(%)," +
+                        "Autumn Avg Temp (°C),Autumn Maximum Temp (°C),Autumn Minimum Temp (°C),Autumn Average Cloud Cover(%)," +
+                        "Rain (mm),Snowfall (cm), Cloud Cover Average(%), Avg Temp Yearly(°C),  Max Temp Yearly (°C), Min Temp Yearly(°C) \n");
 
         // Zpracování dat pro každý rok
         for (int i = 0; i < pocetRoku; i++) {
@@ -254,6 +292,10 @@ public class Main {
             double podzimAvgTeplotas = 0;
             double podzimMaxTeplota = Double.MIN_VALUE;
             double podzimMinTeplota = Double.MAX_VALUE;
+
+            double avgTeplota = 0;
+            double maxTeplota = Double.MIN_VALUE;
+            double minTeplota = Double.MAX_VALUE;
 
             double cloudCoverAvg = 0;
             double cloudCoverZimaAvg = 0;
@@ -307,10 +349,17 @@ public class Main {
 
                     daysInSpring++;
                 }
+                avgTeplota += avg;
+                maxTeplota = Math.max(maxTeplota, max);
+                minTeplota = Math.min(minTeplota, min);
+
                 cloudCoverAvg += cloudCover.getBigDecimal(days).doubleValue();
                 snowfall += snowfalls.getDouble(days);
                 rain += rains.getDouble(days);
             }
+            avgTeplota = avgTeplota / 365.25;
+
+
             cloudCoverAvg = cloudCoverAvg / 365.25;
             cloudCoverLetoAvg = cloudCoverLetoAvg / daysInSummer;
             cloudCoverPodzimAvg = cloudCoverPodzimAvg / daysInAutumn;
@@ -337,7 +386,10 @@ public class Main {
                     .append(String.valueOf(zaokrouhli(cloudCoverPodzimAvg))).append(",")
                     .append(String.valueOf(zaokrouhli(rain))).append(",")
                     .append(String.valueOf(zaokrouhli(snowfall))).append(",")
-                    .append(String.valueOf(zaokrouhli(cloudCoverAvg))).append("\n");
+                    .append(String.valueOf(zaokrouhli(cloudCoverAvg))).append(",")
+                    .append(String.valueOf(zaokrouhli(avgTeplota))).append(",")
+                    .append(String.valueOf(zaokrouhli(maxTeplota))).append(",")
+                    .append(String.valueOf(zaokrouhli(minTeplota))).append(",").append("\n");
 
             System.out.println(i + Integer.parseInt(dny.getString(0).split("-")[0]) + " Zima; Průměrná teplota: " + zaokrouhli(zimaAvgTeplotas / daysInWinter));
             System.out.println(i + Integer.parseInt(dny.getString(0).split("-")[0]) + " Jaro; Průměrná teplota: " + zaokrouhli(jaroAvgTeplotas / daysInSpring));
