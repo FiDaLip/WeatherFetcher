@@ -11,10 +11,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
 public class Main {
     public static void main(String[] args) {
@@ -267,10 +264,16 @@ public class Main {
         FileWriter csvWriter = new FileWriter("out/weather_data_yearly.csv");
         // write header row
         csvWriter.append("Year,Winter Avg Temp (°C),Winter Maximum Temp (°C),Winter Minimum Temp (°C),Winter Average Cloud Cover(%)," +
-                        "Spring Avg Temp (°C),Spring Maximum Temp (°C),Spring Minimum Temp (°C),Spring Average Cloud Cover(%)," +
-                        "Summer Avg Temp (°C),Summer Maximum Temp (°C),Summer Minimum Temp (°C),Summer Average Cloud Cover(%)," +
-                        "Autumn Avg Temp (°C),Autumn Maximum Temp (°C),Autumn Minimum Temp (°C),Autumn Average Cloud Cover(%)," +
-                        "Rain (mm),Snowfall (cm), Cloud Cover Average(%), Avg Temp Yearly(°C),  Max Temp Yearly (°C), Min Temp Yearly(°C) \n");
+                "Spring Avg Temp (°C),Spring Maximum Temp (°C),Spring Minimum Temp (°C),Spring Average Cloud Cover(%)," +
+                "Summer Avg Temp (°C),Summer Maximum Temp (°C),Summer Minimum Temp (°C),Summer Average Cloud Cover(%)," +
+                "Autumn Avg Temp (°C),Autumn Maximum Temp (°C),Autumn Minimum Temp (°C),Autumn Average Cloud Cover(%)," +
+                "Rain (mm),Snowfall (cm), Cloud Cover Average(%), Avg Temp Yearly(°C),  Max Temp Yearly (°C), Min Temp Yearly(°C) \n");
+
+        Map<String, List<Double>> seasonalTemps = new HashMap<>();
+        seasonalTemps.put("jaro", new ArrayList<>());
+        seasonalTemps.put("leto", new ArrayList<>());
+        seasonalTemps.put("podzim", new ArrayList<>());
+        seasonalTemps.put("zima", new ArrayList<>());
 
         // Zpracování dat pro každý rok
         for (int i = 0; i < pocetRoku; i++) {
@@ -366,6 +369,11 @@ public class Main {
             cloudCoverZimaAvg = cloudCoverZimaAvg / daysInWinter;
             cloudCoverJaroAvg = cloudCoverJaroAvg / daysInSpring;
 
+            seasonalTemps.get("jaro").add(zaokrouhli(jaroAvgTeplotas / daysInSpring));
+            seasonalTemps.get("leto").add(zaokrouhli(letoAvgTeplotas / daysInSummer));
+            seasonalTemps.get("podzim").add(zaokrouhli(podzimAvgTeplotas / daysInAutumn));
+            seasonalTemps.get("zima").add(zaokrouhli(zimaAvgTeplotas / daysInWinter));
+
             // Výpočet průměrné teploty na základě skutečného počtu dní
             csvWriter.append(String.valueOf(i + Integer.parseInt(dny.getString(0).split("-")[0]))).append(",")
                     .append(String.valueOf(zaokrouhli(zimaAvgTeplotas / daysInWinter))).append(",")
@@ -397,13 +405,49 @@ public class Main {
             System.out.println(i + Integer.parseInt(dny.getString(0).split("-")[0]) + " Podzim; Průměrná teplota: " + zaokrouhli(podzimAvgTeplotas / daysInAutumn));
             System.out.println(i + Integer.parseInt(dny.getString(0).split("-")[0]) + " Rainfall: " + rain + "; Snowfall: " + snowfall + "; Cloud Cover: " + cloudCoverAvg);
             System.out.println("-------------------------------------------------------------------------------------------------");
+
+            System.out.println("JARO: median = " + median(seasonalTemps.get("jaro")) + " °C, modus = " + modus(seasonalTemps.get("jaro")) + " °C");
+            System.out.println("LÉTO: median = " + median(seasonalTemps.get("leto")) + " °C, modus = " + modus(seasonalTemps.get("leto")) + " °C");
+            System.out.println("PODZIM: median = " + median(seasonalTemps.get("podzim")) + " °C, modus = " + modus(seasonalTemps.get("podzim")) + " °C");
+            System.out.println("ZIMA: median = " + median(seasonalTemps.get("zima")) + " °C, modus = " + modus(seasonalTemps.get("zima")) + " °C");
         }
+
 
         csvWriter.flush();
         csvWriter.close();
         System.out.println("CSV file generated: out/weather_data_yearly.csv");
     }
 
+    public static double median(List<Double> values) {
+        if (values.isEmpty()) return Double.NaN;
+        List<Double> sorted = new ArrayList<>(values);
+        Collections.sort(sorted);
+        int size = sorted.size();
+        if (size % 2 == 1) {
+            return sorted.get(size / 2);
+        } else {
+            return (sorted.get(size / 2 - 1) + sorted.get(size / 2)) / 2.0;
+        }
+    }
+
+    public static double modus(List<Double> values) {
+        if (values.isEmpty()) return Double.NaN;
+        Map<Double, Integer> freqMap = new HashMap<>();
+        for (double val : values) {
+            freqMap.put(val, freqMap.getOrDefault(val, 0) + 1);
+        }
+
+        double mode = values.get(0);
+        int maxCount = 0;
+        for (Map.Entry<Double, Integer> entry : freqMap.entrySet()) {
+            if (entry.getValue() > maxCount) {
+                maxCount = entry.getValue();
+                mode = entry.getKey();
+            }
+        }
+
+        return mode;
+    }
 
     private static double zaokrouhli(double cislo) {
         BigDecimal bigDecimal = new BigDecimal(cislo);
